@@ -235,7 +235,7 @@
             }
         });
         
-        // --- 2. Prompt Improvement Logic ---
+       // --- 2. Prompt Improvement Logic ---
         
         improveButton.addEventListener('click', () => {
             const currentPrompt = promptTextarea.value;
@@ -243,83 +243,78 @@
                 alert("Please enter a prompt first.");
                 return;
             }
-            // Show loading indicators
             feedbackArea.style.display = 'none';
             loadingSpinner.style.display = 'block';
             improveButton.disabled = true;
             
-            // Call the (simulated) API
-            simulateImprovePromptAPI(currentPrompt);
+            // This is no longer a simulation!
+            callRealImprovePromptAPI(currentPrompt);
         });
 
         /**
-         * !! THIS IS A SIMULATION !!
-         * Replace this function with a real 'fetch' call to your prompt-improvement AI.
-         * This AI would take the user's text and return either:
-         * a) An "improved" version of the prompt.
-         * b) A follow-up question to get more details.
+         * !! THIS IS THE REAL API CALL !!
+         * This function reads from localStorage (set by your userscript)
+         * and makes the actual network request.
          */
-        function simulateImprovePromptAPI(prompt) {
-            console.log("Simulating API call to improve prompt:", prompt);
-            
-            // Simulate a network delay
-            setTimeout(() => {
+        function callRealImprovePromptAPI(prompt) {
+            // Get credentials from localStorage
+            const apiEndpoint = localStorage.getItem('IMPROVE_API_ENDPOINT');
+            const apiKey = localStorage.getItem('IMPROVE_API_KEY');
+
+            // Check if keys exist
+            if (!apiEndpoint || !apiKey) {
+                alert("Error: Prompt Improvement API endpoint or key is not set in localStorage.");
                 loadingSpinner.style.display = 'none';
                 improveButton.disabled = false;
-                feedbackArea.style.display = 'block';
+                return;
+            }
 
-                // --- SIMULATION LOGIC ---
-                // Randomly decide whether to ask a question or improve the prompt
-                if (prompt.toLowerCase().includes("summarize") && !prompt.toLowerCase().includes("format")) {
-                    // Scenario 1: Ask a follow-up question
-                    feedbackArea.innerHTML = `
-                        <strong>Follow-up Question:</strong>
-                        <p>What format would you like the summary in? (e.g., bullet points, a single paragraph, key topics)</p>
-                    `;
-                } else if (prompt.length < 15) {
-                    // Scenario 2: Improve the prompt
-                    feedbackArea.innerHTML = "<strong>Suggestion:</strong> Your prompt is a bit short. Try adding more context.";
-                    promptTextarea.value = prompt + " -- please provide a detailed and comprehensive answer.";
+            console.log("Calling Prompt Improvement API:", apiEndpoint);
+
+            // --- REAL FETCH CALL ---
+            fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + apiKey 
+                },
+                body: JSON.stringify({ prompt: prompt })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                feedbackArea.style.display = 'block';
+                // --- Process your API's specific response ---
+                // (You must adapt this part to match your API's JSON response)
+                if (data.followUpQuestion) {
+                    feedbackArea.innerHTML = `<strong>Follow-up:</strong> ${data.followUpQuestion}`;
+                } else if (data.improvedPrompt) {
+                    promptTextarea.value = data.improvedPrompt;
+                    feedbackArea.innerHTML = "<strong>Suggestion:</strong> I've improved your prompt!";
                 } else {
-                    // Scenario 3: No improvements needed
                     feedbackArea.innerHTML = "<strong>Feedback:</strong> Prompt looks good!";
                 }
-                // --- END SIMULATION ---
-                
-                /*
-                // --- EXAMPLE OF A REAL FETCH CALL ---
-                fetch('YOUR_PROMPT_IMPROVEMENT_API_ENDPOINT', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer YOUR_API_KEY' },
-                    body: JSON.stringify({ prompt: prompt })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.followUpQuestion) {
-                        feedbackArea.innerHTML = `<strong>Follow-up:</strong> ${data.followUpQuestion}`;
-                    } else if (data.improvedPrompt) {
-                        promptTextarea.value = data.improvedPrompt;
-                        feedbackArea.innerHTML = "<strong>Suggestion:</strong> I've improved your prompt!";
-                    }
-                })
-                .catch(err => {
-                    console.error('Error improving prompt:', err);
-                    feedbackArea.innerHTML = "Error connecting to prompt improvement service.";
-                })
-                .finally(() => {
-                    loadingSpinner.style.display = 'none';
-                    improveButton.disabled = false;
-                });
-                */
-
-            }, 1500); // 1.5 second delay
+            })
+            .catch(err => {
+                console.error('Error improving prompt:', err);
+                feedbackArea.style.display = 'block';
+                feedbackArea.innerHTML = `Error connecting to prompt service: ${err.message}`;
+            })
+            .finally(() => {
+                loadingSpinner.style.display = 'none';
+                improveButton.disabled = false;
+            });
         }
+
 
         // --- 3. Main AI Submission Logic ---
 
         submitButton.addEventListener('click', () => {
             const prompt = promptTextarea.value;
-
             if (!prompt) {
                 alert("Please provide a text prompt.");
                 return;
@@ -329,71 +324,72 @@
                 return;
             }
             
-            // Disable button and show loading state
             submitButton.disabled = true;
             submitButton.textContent = 'Submitting...';
 
-            // Call the (simulated) Main AI API
-            simulateMainAI_API(prompt, audioBlob);
+            // This is no longer a simulation!
+            callRealMainAI_API(prompt, audioBlob);
         });
 
         /**
-         * !! THIS IS A SIMULATION !!
-         * Replace this function with a real 'fetch' call to your main AI model.
-         * This API needs to accept *both* text and an audio file.
-         * The standard way to do this is using 'FormData'.
+         * !! THIS IS THE REAL API CALL !!
+         * This function reads from localStorage (set by your userscript)
+         * and sends both the prompt and the audio file.
          */
-        function simulateMainAI_API(prompt, audioData) {
-            console.log("Simulating Main AI API Call with:");
-            console.log("Prompt:", prompt);
-            console.log("Audio Data:", audioData);
+        function callRealMainAI_API(prompt, audioData) {
+            // Get credentials from localStorage
+            const apiEndpoint = localStorage.getItem('MAIN_AI_API_ENDPOINT');
+            const apiKey = localStorage.getItem('MAIN_AI_API_KEY');
+
+            // Check if keys exist
+            if (!apiEndpoint || !apiKey) {
+                alert("Error: Main AI API endpoint or key is not set in localStorage.");
+                submitButton.disabled = false;
+                submitButton.textContent = 'Submit Audio and Prompt';
+                return;
+            }
+
+            console.log("Calling Main AI API:", apiEndpoint);
 
             // Use FormData to package the text and audio file
             const formData = new FormData();
             formData.append('prompt', prompt);
             formData.append('audio_file', audioData, 'recording.webm'); // 'audio_file' is the key the server expects
 
-            // Simulate network delay
-            setTimeout(() => {
-                // Reset button
-                submitButton.disabled = false;
-                submitButton.textContent = 'Submit Audio and Prompt';
-                
-                // Show a success message
-                alert("Submission successful (simulated)!\nCheck the console (F12) to see the data that would have been sent.");
-                
-                // You would handle the AI's *response* here
-                
-            }, 2000); // 2 second delay
-            
-            /*
-            // --- EXAMPLE OF A REAL FETCH CALL ---
-            fetch('YOUR_MAIN_AI_API_ENDPOINT', {
+            // --- REAL FETCH CALL ---
+            fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
-                    // Note: When using FormData, you *don't* set 'Content-Type'. 
+                    // IMPORTANT: When using FormData, *do not* set 'Content-Type'.
                     // The browser sets it automatically with the correct 'boundary'.
-                    'Authorization': 'Bearer YOUR_API_KEY' 
+                    'Authorization': 'Bearer ' + apiKey 
                 },
                 body: formData 
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 console.log('AI Response:', data);
-                // e.g., display the transcription, summary, or AI answer
+                // --- Process your API's specific response ---
+                // (e.g., display the transcription, summary, or AI answer)
                 feedbackArea.style.display = 'block';
-                feedbackArea.innerHTML = `<strong>AI Response:</strong> ${data.result}`;
+                // This is an example, change 'data.result' to match your API response
+                feedbackArea.innerHTML = `<strong>AI Response:</strong> ${data.result || JSON.stringify(data)}`;
             })
             .catch(err => {
                 console.error('Error submitting to AI:', err);
-                alert('Error submitting to AI.');
+                feedbackArea.style.display = 'block';
+                feedbackArea.innerHTML = `Error submitting to AI: ${err.message}`;
             })
             .finally(() => {
                 // Reset button
                 submitButton.disabled = false;
                 submitButton.textContent = 'Submit Audio and Prompt';
             });
-            */
         }
         
         // --- Helper Function ---
