@@ -395,11 +395,22 @@
             let fileId = null;
             let actualMimeType = browserMimeType;
 
+            let actualAudioData = audioData; // We might replace this with a temporary Blob
+
+            // --- CRITICAL FIX: Aggressively change OGG/unsupported files to WEBM ---
             if (audioData instanceof File) {
-                // Check file extension to set a known MIME type
                 const fileName = audioData.name.toLowerCase();
-                if (fileName.endsWith('.ogg')) {
-                    actualMimeType = 'audio/ogg'; // Force the correct MIME type for OGG
+                
+                // Check for common problem types (e.g., OGG, or generic files)
+                if (fileName.endsWith('.ogg') || actualMimeType.includes('octet-stream')) {
+                    // Force it to a format the Gemini API is known to accept
+                    actualMimeType = 'audio/webm'; 
+                    
+                    // Create a new Blob using the audioData but explicitly setting the new type.
+                    // This is the cleanest way to repackage the Blob header before passing to new File.
+                    actualAudioData = new Blob([audioData], { type: actualMimeType });
+                    
+                    console.warn(`File type forced to ${actualMimeType} for compatibility.`);
                 } else if (fileName.endsWith('.mp3')) {
                     actualMimeType = 'audio/mp3';
                 } else if (fileName.endsWith('.wav')) {
@@ -409,7 +420,7 @@
 
             try {
                 // 1. Upload File
-                fileId = await uploadGeminiFile(audioData, actualMimeType);
+                fileId = await uploadGeminiFile(actualAudioData, actualMimeType);
                 
                 // 2. Generate Content
                 const responseData = await generateContent(prompt, fileId, actualMimeType);
