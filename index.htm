@@ -394,6 +394,7 @@
         async function callGeminiFlashAPI(prompt, audioData, browserMimeType) {
             let fileId = null;
             let actualMimeType = browserMimeType;
+            const CORRECTED_MIME_TYPE = 'audio/webm';
 
             let actualAudioData = audioData; // We might replace this with a temporary Blob
 
@@ -408,9 +409,9 @@
                     
                     // Create a new Blob using the audioData but explicitly setting the new type.
                     // This is the cleanest way to repackage the Blob header before passing to new File.
-                    actualAudioData = new Blob([audioData], { type: actualMimeType });
+                    actualAudioData = new Blob([audioData], { type: CORRECTED_MIME_TYPE });
                     
-                    console.warn(`File type forced to ${actualMimeType} for compatibility.`);
+                    console.warn(`File type forced to ${CORRECTED_MIME_TYPE} for compatibility.`);
                 } else if (fileName.endsWith('.mp3')) {
                     actualMimeType = 'audio/mp3';
                 } else if (fileName.endsWith('.wav')) {
@@ -420,10 +421,10 @@
 
             try {
                 // 1. Upload File
-                fileId = await uploadGeminiFile(actualAudioData, actualMimeType);
+                fileId = await uploadGeminiFile(actualAudioData, CORRECTED_MIME_TYPE);
                 
                 // 2. Generate Content
-                const responseData = await generateContent(prompt, fileId, actualMimeType);
+                const responseData = await generateContent(prompt, fileId, CORRECTED_MIME_TYPE);
 
                 // Check for a valid response and display
                 const textResult = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || "No text response found.";
