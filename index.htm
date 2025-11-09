@@ -300,7 +300,10 @@
             // The endpoint should be correct
             const uploadEndpoint = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`; 
             const formData = new FormData();
-            formData.append('file', audioData, 'user_audio.file'); 
+
+            const correctedFile = new File([audioData], `user_audio.${mimeType.split('/')[1] || 'ogg'}`, { type: mimeType });
+
+            formData.append('file', correctedFile); 
             formData.append('mimeType', mimeType);
 
             setLoading(true, '1/2: Uploading audio file...');
@@ -403,7 +406,7 @@
                     actualMimeType = 'audio/wav';
                 }
             }
-            
+
             try {
                 // 1. Upload File
                 fileId = await uploadGeminiFile(audioData, actualMimeType);
