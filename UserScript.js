@@ -14,10 +14,10 @@
 
     // We define the keys our HTML page will need
     const KEYS_TO_CHECK = {
-        'OPENAI_API_KEY': {
-            prompt: "Please enter your OpenAI API Key (for Whisper, GPT-4o):",
-            default: "sk-..."
-        },
+        // 'OPENAI_API_KEY': {
+        //     prompt: "Please enter your OpenAI API Key (for Whisper, GPT-4o):",
+        //     default: "sk-..."
+        // },
         'GOOGLE_AI_KEY': {
             prompt: "Please enter your Google AI API Key (for Gemini):",
             default: "AIzaSy..."

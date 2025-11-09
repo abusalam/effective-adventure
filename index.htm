@@ -50,7 +50,7 @@
         #recordButton.recording { background-color: #c0392b; animation: pulse 1.5s infinite; }
         #stopButton { background-color: #555; color: white; }
         #submitButton {
-            background-color: #3498db; /* Changed color to blue for Gemini focus */
+            background-color: #3498db;
             color: white;
             font-size: 16px;
             padding: 12px 20px;
@@ -75,13 +75,9 @@
             display: block;
             margin-bottom: 8px;
         }
-        select {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background-color: #fff;
+        input[type="file"] {
+            display: block;
+            margin-top: 5px;
         }
 
         #feedbackArea {
@@ -127,15 +123,23 @@
         </div>
 
         <div class="section">
-            <h2>1. Record Audio</h2>
-            <button id="recordButton">Start Recording</button>
-            <button id="stopButton" disabled>Stop Recording</button>
+            <h2>1. Record or Upload Audio</h2>
+            <div id="recordingControls">
+                <button id="recordButton">Start Recording</button>
+                <button id="stopButton" disabled>Stop Recording</button>
+            </div>
+            
+            <div id="uploadControl" style="margin-top: 15px;">
+                <label for="audioFile">Or upload an audio file:</label>
+                <input type="file" id="audioFile" accept="audio/*">
+            </div>
+
             <audio id="audioPlayback" controls></audio>
         </div>
 
         <div class="section">
             <h2>2. Write Prompt</h2>
-            <textarea id="promptTextarea" placeholder="Ask Gemini about your recording (e.g., 'Transcribe this audio, then summarize the key points.')"></textarea>
+            <textarea id="promptTextarea" placeholder="Ask Gemini about your audio (e.g., 'Transcribe this audio, then summarize the key points.')"></textarea>
         </div>
 
         <div class="section">
@@ -152,34 +156,51 @@
         // Get references to all our HTML elements
         const recordButton = document.getElementById('recordButton');
         const stopButton = document.getElementById('stopButton');
+        const audioFile = document.getElementById('audioFile'); // NEW ELEMENT
         const audioPlayback = document.getElementById('audioPlayback');
         const promptTextarea = document.getElementById('promptTextarea');
         const submitButton = document.getElementById('submitButton');
         const feedbackArea = document.getElementById('feedbackArea');
         const loadingSpinner = document.getElementById('loadingSpinner');
+        const recordingControls = document.getElementById('recordingControls'); // NEW ELEMENT
         
-        // Removed: const modelSelect = document.getElementById('modelSelect');
-
         let mediaRecorder;
         let audioChunks = [];
         let audioBlob = null;
         let audioUrl = null;
 
-        // --- 1. Audio Recording Logic (Unchanged) ---
+        // --- Helper Function ---
+        function updateButtonStates() {
+            // Enable submit if we have a blob (from recording or upload)
+            submitButton.disabled = !audioBlob;
+            
+            // Clear the audio input if we switch to recording
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                audioFile.value = ''; // Clear file input
+            }
+        }
+
+        // --- 1a. Audio Recording Logic ---
         recordButton.addEventListener('click', async () => {
             try {
+                // Clear any previously uploaded file
+                audioFile.value = '';
+                
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 mediaRecorder.addEventListener('dataavailable', event => {
                     audioChunks.push(event.data);
                 });
                 mediaRecorder.addEventListener('stop', () => {
-                    // Note: Use a common type like 'audio/wav' or 'audio/mp3' if webm fails API validation.
+                    // Use audio/webm for the recorded file
                     audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
                     audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     audioChunks = [];
                     stream.getTracks().forEach(track => track.stop());
+                    
+                    // Re-enable file upload
+                    audioFile.disabled = false; 
                     updateButtonStates();
                 });
                 mediaRecorder.start();
@@ -188,11 +209,13 @@
                 stopButton.disabled = false;
                 recordButton.disabled = true;
                 submitButton.disabled = true;
+                audioFile.disabled = true; // Disable upload while recording
             } catch (err) {
                 console.error('Error starting recording:', err);
                 alert('Could not start recording. Please ensure you have given microphone permissions.');
             }
         });
+
         stopButton.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
@@ -202,8 +225,35 @@
                 recordButton.disabled = false;
             }
         });
+
+        // --- 1b. Audio File Upload Logic (NEW) ---
+        audioFile.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                // The uploaded file IS our new audioBlob
+                audioBlob = file;
+                
+                // Set the playback URL and MIME type
+                audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayback.src = audioUrl;
+                
+                // Disable recording buttons since a file is uploaded
+                recordButton.disabled = true;
+                stopButton.disabled = true;
+                recordButton.textContent = 'Start Recording';
+                recordButton.classList.remove('recording');
+
+                updateButtonStates();
+            } else {
+                audioBlob = null;
+                audioPlayback.src = '';
+                // Re-enable recording if upload is cancelled
+                recordButton.disabled = false;
+                updateButtonStates();
+            }
+        });
         
-        // --- 2. Main AI Submission Logic (Modified for Gemini Two-Step) ---
+        // --- 2. Main AI Submission Logic (Orchestrator) ---
 
         submitButton.addEventListener('click', () => {
             const prompt = promptTextarea.value;
@@ -213,12 +263,12 @@
                 return;
             }
             if (!audioBlob) {
-                alert("Please record audio first.");
+                alert("Please record or upload audio first.");
                 return;
             }
             
-            // Start the two-step process
-            callGeminiFlashAPI(prompt, audioBlob);
+            // The audioBlob's type property will be used for the upload MIME type
+            callGeminiFlashAPI(prompt, audioBlob, audioBlob.type);
         });
 
         /**
@@ -241,7 +291,7 @@
         /**
          * STEP 1: Upload the audio file to the Gemini API.
          */
-        async function uploadGeminiFile(audioData) {
+        async function uploadGeminiFile(audioData, mimeType) {
             const apiKey = localStorage.getItem('GOOGLE_AI_KEY');
             if (!apiKey) {
                 throw new Error("Google AI Key not found. The userscript should have asked for it.");
@@ -250,8 +300,9 @@
             const uploadEndpoint = `https://generativelanguage.googleapis.com/v1beta/files?key=${apiKey}`;
 
             const formData = new FormData();
-            formData.append('file', audioData, 'recording.webm');
-            formData.append('mimeType', 'audio/webm');
+            // Naming the file 'user_audio' and giving it the correct Blob/File type
+            formData.append('file', audioData, 'user_audio.file'); 
+            formData.append('mimeType', mimeType);
 
             setLoading(true, '1/2: Uploading audio file...');
 
@@ -272,7 +323,7 @@
         /**
          * STEP 2: Send the prompt and file ID to the generateContent endpoint.
          */
-        async function generateContent(prompt, fileId) {
+        async function generateContent(prompt, fileId, mimeType) {
             const apiKey = localStorage.getItem('GOOGLE_AI_KEY');
             const contentEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -284,7 +335,7 @@
                     {
                         parts: [
                             { text: prompt },
-                            { fileData: { mimeType: 'audio/webm', fileUri: fileId } } // Use the file ID as the URI
+                            { fileData: { mimeType: mimeType, fileUri: fileId } } // Use the file ID as the URI
                         ]
                     }
                 ]
@@ -327,14 +378,14 @@
         /**
          * Orchestrator function for the entire process.
          */
-        async function callGeminiFlashAPI(prompt, audioData) {
+        async function callGeminiFlashAPI(prompt, audioData, mimeType) {
             let fileId = null;
             try {
                 // 1. Upload File
-                fileId = await uploadGeminiFile(audioData);
+                fileId = await uploadGeminiFile(audioData, mimeType);
                 
                 // 2. Generate Content
-                const responseData = await generateContent(prompt, fileId);
+                const responseData = await generateContent(prompt, fileId, mimeType);
 
                 // Check for a valid response and display
                 const textResult = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || "No text response found.";
@@ -352,15 +403,6 @@
                     deleteGeminiFile(fileId);
                 }
                 setLoading(false);
-            }
-        }
-
-        // --- Helper Function ---
-        function updateButtonStates() {
-            if (audioBlob) {
-                submitButton.disabled = false;
-            } else {
-                submitButton.disabled = true;
             }
         }
     </script>
