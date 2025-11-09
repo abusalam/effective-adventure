@@ -388,14 +388,28 @@
         /**
          * Orchestrator function for the entire process.
          */
-        async function callGeminiFlashAPI(prompt, audioData, mimeType) {
+        async function callGeminiFlashAPI(prompt, audioData, browserMimeType) {
             let fileId = null;
+            let actualMimeType = browserMimeType;
+
+            if (audioData instanceof File) {
+                // Check file extension to set a known MIME type
+                const fileName = audioData.name.toLowerCase();
+                if (fileName.endsWith('.ogg')) {
+                    actualMimeType = 'audio/ogg'; // Force the correct MIME type for OGG
+                } else if (fileName.endsWith('.mp3')) {
+                    actualMimeType = 'audio/mp3';
+                } else if (fileName.endsWith('.wav')) {
+                    actualMimeType = 'audio/wav';
+                }
+            }
+            
             try {
                 // 1. Upload File
-                fileId = await uploadGeminiFile(audioData, mimeType);
+                fileId = await uploadGeminiFile(audioData, actualMimeType);
                 
                 // 2. Generate Content
-                const responseData = await generateContent(prompt, fileId, mimeType);
+                const responseData = await generateContent(prompt, fileId, actualMimeType);
 
                 // Check for a valid response and display
                 const textResult = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || "No text response found.";
