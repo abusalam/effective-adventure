@@ -298,8 +298,7 @@
             }
             
             // The endpoint should be correct
-            const uploadEndpoint = `https://generativelanguage.googleapis.com/v1beta/files?key=${apiKey}`;
-
+            const uploadEndpoint = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`; 
             const formData = new FormData();
             formData.append('file', audioData, 'user_audio.file'); 
             formData.append('mimeType', mimeType);
@@ -319,8 +318,8 @@
             }
 
             const data = await response.json();
-            
-            // --- CRITICAL CHECK: Extract the 'name' field ---
+            console.log('Raw Upload API Response:', data);
+                
             if (!data || !data.name) {
                 console.error("Upload response missing 'name' field:", data);
                 throw new Error("File upload succeeded but did not return a file 'name' identifier.");
