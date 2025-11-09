@@ -26,27 +26,14 @@
             padding: 25px;
             box-sizing: border-box;
         }
-        h1 {
-            text-align: center;
-            color: #111;
-            margin-top: 0;
-        }
+        h1 { text-align: center; color: #111; margin-top: 0; }
         .section {
             margin-bottom: 25px;
             border-bottom: 1px solid #eee;
             padding-bottom: 25px;
         }
-        .section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
-        h2 {
-            margin-top: 0;
-            color: #444;
-        }
-        
-        /* Button Styles */
+        .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        h2 { margin-top: 0; color: #444; }
         button {
             padding: 10px 15px;
             font-size: 14px;
@@ -57,39 +44,19 @@
             transition: background-color 0.2s, transform 0.1s;
             margin-right: 10px;
         }
-        button:active {
-            transform: scale(0.98);
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #recordButton {
-            background-color: #e34040;
-            color: white;
-        }
-        #recordButton.recording {
-            background-color: #c0392b;
-            animation: pulse 1.5s infinite;
-        }
-        #stopButton {
-            background-color: #555;
-            color: white;
-        }
-        #improveButton {
-            background-color: #3498db;
-            color: white;
-        }
+        button:active { transform: scale(0.98); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #recordButton { background-color: #e34040; color: white; }
+        #recordButton.recording { background-color: #c0392b; animation: pulse 1.5s infinite; }
+        #stopButton { background-color: #555; color: white; }
         #submitButton {
             background-color: #2ecc71;
             color: white;
             font-size: 16px;
             padding: 12px 20px;
             width: 100%;
-            margin-top: 15px;
+            margin-top: 20px;
         }
-
-        /* Textarea and Audio Player */
         textarea {
             width: 100%;
             box-sizing: border-box;
@@ -100,26 +67,41 @@
             font-size: 14px;
             margin-bottom: 10px;
         }
-        audio {
-            width: 100%;
-            margin-top: 15px;
-        }
+        audio { width: 100%; margin-top: 15px; }
         
-        /* Feedback Area */
+        /* (Added) New styles for the dropdown */
+        label {
+            font-weight: 600;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background-color: #fff;
+        }
+
         #feedbackArea {
-            font-style: italic;
-            color: #555;
-            background-color: #f9f9f9;
-            border: 1px dashed #ccc;
-            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 15px;
             border-radius: 6px;
             margin-top: 15px;
-            display: none; /* Hidden by default */
+            display: none;
+            white-space: pre-wrap; /* Keeps formatting */
+            word-wrap: break-word;
         }
         #loadingSpinner {
-            display: none; /* Hidden by default */
+            display: none;
             font-style: italic;
             color: #777;
+            margin-top: 10px;
         }
 
         @keyframes pulse {
@@ -132,7 +114,7 @@
 <body>
 
     <div class="container">
-        <h1>AI Multi-Modal Input</h1>
+        <h1>AI Multi-Model Recorder</h1>
 
         <div class="section">
             <h2>1. Record Audio</h2>
@@ -143,15 +125,24 @@
 
         <div class="section">
             <h2>2. Write Prompt</h2>
-            <textarea id="promptTextarea" placeholder="Enter your prompt... (e.g., 'Summarize the audio', 'Transcribe this', 'What is the sentiment?')"></textarea>
-            <button id="improveButton">Improve Prompt</button>
-            <div id="loadingSpinner">Checking for prompt improvements...</div>
-            <div id="feedbackArea"></div>
+            <textarea id="promptTextarea" placeholder="Enter your prompt... (e.g., for Whisper, this prompt guides the transcription style or provides context.)"></textarea>
         </div>
 
         <div class="section">
-            <h2>3. Submit to AI</h2>
+            <h2>3. Select Model & Submit</h2>
+            
+            <label for="modelSelect">Select AI Model:</label>
+            <select id="modelSelect">
+                <option value="" disabled selected>-- Choose a model --</option>
+                <option value="whisper">OpenAI - Whisper (Transcription)</option>
+                <option value="gpt4o_stub">OpenAI - GPT-4o (Chat Stub)</option>
+                <option value="gemini_stub">Google - Gemini 1.5 Pro (Chat Stub)</option>
+            </select>
+            
             <button id="submitButton" disabled>Submit Audio and Prompt</button>
+            
+            <div id="loadingSpinner">Contacting AI...</div>
+            <div id="feedbackArea"></div>
         </div>
     </div>
 
@@ -161,73 +152,46 @@
         const stopButton = document.getElementById('stopButton');
         const audioPlayback = document.getElementById('audioPlayback');
         const promptTextarea = document.getElementById('promptTextarea');
-        const improveButton = document.getElementById('improveButton');
+        const modelSelect = document.getElementById('modelSelect'); // (Added)
+        const submitButton = document.getElementById('submitButton');
         const feedbackArea = document.getElementById('feedbackArea');
         const loadingSpinner = document.getElementById('loadingSpinner');
-        const submitButton = document.getElementById('submitButton');
 
-        let mediaRecorder; // The MediaRecorder object
-        let audioChunks = []; // Array to store recorded audio chunks
-        let audioBlob = null; // The final audio Blob
-        let audioUrl = null; // URL for the audio playback
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob = null;
+        let audioUrl = null;
 
-        // --- 1. Audio Recording Logic ---
-
-        // When "Start Recording" is clicked
+        // --- 1. Audio Recording Logic (Unchanged) ---
         recordButton.addEventListener('click', async () => {
             try {
-                // Request access to the user's microphone
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Initialize the MediaRecorder
                 mediaRecorder = new MediaRecorder(stream);
-
-                // Event handler: When data is available, add it to our chunks
                 mediaRecorder.addEventListener('dataavailable', event => {
                     audioChunks.push(event.data);
                 });
-
-                // Event handler: When recording stops
                 mediaRecorder.addEventListener('stop', () => {
-                    // Combine all chunks into a single Blob
-                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // You can change the type if needed
-                    
-                    // Create a URL for the Blob
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     audioUrl = URL.createObjectURL(audioBlob);
-                    
-                    // Set the audio player's source to the new URL
                     audioPlayback.src = audioUrl;
-
-                    // Clean up
                     audioChunks = [];
-                    stream.getTracks().forEach(track => track.stop()); // Stop the mic stream
-                    
-                    // Update UI
+                    stream.getTracks().forEach(track => track.stop());
                     updateButtonStates();
                 });
-
-                // Start recording
                 mediaRecorder.start();
-                
-                // Update UI
                 recordButton.textContent = 'Recording...';
                 recordButton.classList.add('recording');
                 stopButton.disabled = false;
                 recordButton.disabled = true;
                 submitButton.disabled = true;
-
             } catch (err) {
                 console.error('Error starting recording:', err);
                 alert('Could not start recording. Please ensure you have given microphone permissions.');
             }
         });
-
-        // When "Stop Recording" is clicked
         stopButton.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
-
-                // Update UI
                 recordButton.textContent = 'Start Recording';
                 recordButton.classList.remove('recording');
                 stopButton.disabled = true;
@@ -235,88 +199,14 @@
             }
         });
         
-       // --- 2. Prompt Improvement Logic ---
-        
-        improveButton.addEventListener('click', () => {
-            const currentPrompt = promptTextarea.value;
-            if (!currentPrompt) {
-                alert("Please enter a prompt first.");
-                return;
-            }
-            feedbackArea.style.display = 'none';
-            loadingSpinner.style.display = 'block';
-            improveButton.disabled = true;
-            
-            // This is no longer a simulation!
-            callRealImprovePromptAPI(currentPrompt);
-        });
-
-        /**
-         * !! THIS IS THE REAL API CALL !!
-         * This function reads from localStorage (set by your userscript)
-         * and makes the actual network request.
-         */
-        function callRealImprovePromptAPI(prompt) {
-            // Get credentials from localStorage
-            const apiEndpoint = localStorage.getItem('IMPROVE_API_ENDPOINT');
-            const apiKey = localStorage.getItem('IMPROVE_API_KEY');
-
-            // Check if keys exist
-            if (!apiEndpoint || !apiKey) {
-                alert("Error: Prompt Improvement API endpoint or key is not set in localStorage.");
-                loadingSpinner.style.display = 'none';
-                improveButton.disabled = false;
-                return;
-            }
-
-            console.log("Calling Prompt Improvement API:", apiEndpoint);
-
-            // --- REAL FETCH CALL ---
-            fetch(apiEndpoint, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + apiKey 
-                },
-                body: JSON.stringify({ prompt: prompt })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                feedbackArea.style.display = 'block';
-                // --- Process your API's specific response ---
-                // (You must adapt this part to match your API's JSON response)
-                if (data.followUpQuestion) {
-                    feedbackArea.innerHTML = `<strong>Follow-up:</strong> ${data.followUpQuestion}`;
-                } else if (data.improvedPrompt) {
-                    promptTextarea.value = data.improvedPrompt;
-                    feedbackArea.innerHTML = "<strong>Suggestion:</strong> I've improved your prompt!";
-                } else {
-                    feedbackArea.innerHTML = "<strong>Feedback:</strong> Prompt looks good!";
-                }
-            })
-            .catch(err => {
-                console.error('Error improving prompt:', err);
-                feedbackArea.style.display = 'block';
-                feedbackArea.innerHTML = `Error connecting to prompt service: ${err.message}`;
-            })
-            .finally(() => {
-                loadingSpinner.style.display = 'none';
-                improveButton.disabled = false;
-            });
-        }
-
-
-        // --- 3. Main AI Submission Logic ---
+        // --- 3. Main AI Submission Logic (Completely Modified) ---
 
         submitButton.addEventListener('click', () => {
             const prompt = promptTextarea.value;
-            if (!prompt) {
-                alert("Please provide a text prompt.");
+            const model = modelSelect.value;
+
+            if (!model) {
+                alert("Please select an AI model from the dropdown.");
                 return;
             }
             if (!audioBlob) {
@@ -324,77 +214,139 @@
                 return;
             }
             
-            submitButton.disabled = true;
-            submitButton.textContent = 'Submitting...';
+            // Show loading state
+            setLoading(true);
 
-            // This is no longer a simulation!
-            callRealMainAI_API(prompt, audioBlob);
+            // Route to the correct API handler based on dropdown
+            switch (model) {
+                case 'whisper':
+                    callWhisperAPI(prompt, audioBlob);
+                    break;
+                case 'gpt4o_stub':
+                    handleGpt4oStub();
+                    break;
+                case 'gemini_stub':
+                    handleGeminiStub();
+                    break;
+                default:
+                    alert("Invalid model selected.");
+                    setLoading(false);
+            }
         });
 
         /**
-         * !! THIS IS THE REAL API CALL !!
-         * This function reads from localStorage (set by your userscript)
-         * and sends both the prompt and the audio file.
+         * SETS THE LOADING STATE
          */
-        function callRealMainAI_API(prompt, audioData) {
-            // Get credentials from localStorage
-            const apiEndpoint = localStorage.getItem('MAIN_AI_API_ENDPOINT');
-            const apiKey = localStorage.getItem('MAIN_AI_API_KEY');
-
-            // Check if keys exist
-            if (!apiEndpoint || !apiKey) {
-                alert("Error: Main AI API endpoint or key is not set in localStorage.");
+        function setLoading(isLoading) {
+            if (isLoading) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Submitting...';
+                loadingSpinner.style.display = 'block';
+                feedbackArea.style.display = 'none';
+            } else {
                 submitButton.disabled = false;
                 submitButton.textContent = 'Submit Audio and Prompt';
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        /**
+         * HANDLER 1: OpenAI Whisper (Transcription)
+         * This is a fully working example!
+         */
+        function callWhisperAPI(prompt, audioData) {
+            const apiKey = localStorage.getItem('OPENAI_API_KEY');
+            if (!apiKey) {
+                alert("OpenAI API Key not found. The userscript should have asked for it.");
+                setLoading(false);
                 return;
             }
+            
+            const apiEndpoint = 'https://api.openai.com/v1/audio/transcriptions';
 
-            console.log("Calling Main AI API:", apiEndpoint);
-
-            // Use FormData to package the text and audio file
             const formData = new FormData();
-            formData.append('prompt', prompt);
-            formData.append('audio_file', audioData, 'recording.webm'); // 'audio_file' is the key the server expects
+            formData.append('file', audioData, 'recording.webm');
+            formData.append('model', 'whisper-1');
+            // The prompt guides the model's style and helps with specific words.
+            if (prompt) {
+                formData.append('prompt', prompt);
+            }
 
-            // --- REAL FETCH CALL ---
             fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
-                    // IMPORTANT: When using FormData, *do not* set 'Content-Type'.
-                    // The browser sets it automatically with the correct 'boundary'.
-                    'Authorization': 'Bearer ' + apiKey 
+                    'Authorization': `Bearer ${apiKey}`
                 },
-                body: formData 
+                body: formData
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json().then(err => {
+                         throw new Error(`API Error (${response.status}): ${err.error.message}`);
+                    });
                 }
                 return response.json();
             })
             .then(data => {
-                console.log('AI Response:', data);
-                // --- Process your API's specific response ---
-                // (e.g., display the transcription, summary, or AI answer)
+                console.log('Whisper Response:', data);
                 feedbackArea.style.display = 'block';
-                // This is an example, change 'data.result' to match your API response
-                feedbackArea.innerHTML = `<strong>AI Response:</strong> ${data.result || JSON.stringify(data)}`;
+                feedbackArea.textContent = data.text; // The transcription
             })
             .catch(err => {
-                console.error('Error submitting to AI:', err);
+                console.error('Error with Whisper API:', err);
                 feedbackArea.style.display = 'block';
-                feedbackArea.innerHTML = `Error submitting to AI: ${err.message}`;
+                feedbackArea.textContent = `Error: ${err.message}`;
             })
             .finally(() => {
-                // Reset button
-                submitButton.disabled = false;
-                submitButton.textContent = 'Submit Audio and Prompt';
+                setLoading(false);
             });
         }
+
+        /**
+         * HANDLER 2: GPT-4o (Stub)
+         * This is a non-functional stub to explain the complexity.
+         */
+        function handleGpt4oStub() {
+            const message = `
+                --- GPT-4o STUB ---
+                
+                This is a placeholder. Making GPT-4o work with audio in a static HTML file is very complex.
+                
+                Why? The 'chat/completions' API (which GPT-4o uses) expects audio to be provided as a URL, not a file upload.
+                
+                To make this work, you would need a server to:
+                1. Receive your audio file.
+                2. Upload it to a public-facing URL (like Amazon S3 or Google Cloud Storage).
+                3. Send the API request to OpenAI, including your text prompt AND the new public URL of the audio.
+            `;
+            alert(message);
+            console.warn(message);
+            setLoading(false);
+        }
         
-        // --- Helper Function ---
-        
-        // This function checks if we have audio and enables/disables the submit button
+        /**
+         * HANDLER 3: Google Gemini (Stub)
+         * This is a non-functional stub to explain the complexity.
+         */
+        function handleGeminiStub() {
+            const message = `
+                --- Gemini 1.5 Pro STUB ---
+                
+                This is a placeholder. The Google Gemini API for audio is a two-step process and is not feasible in this simple static page.
+                
+                To make this work, you would need to:
+                1. Make a FIRST API call to Google's 'files.upload' endpoint to upload the audio file.
+                2. Google's API returns a unique 'name' (e.g., 'files/12345abc').
+                3. Make a SECOND API call to Google's 'generateContent' endpoint, sending your text prompt AND the 'name' of the file you just uploaded.
+                
+                This complex, multi-step process is best managed by a backend server.
+            `;
+            alert(message);
+            console.warn(message);
+            setLoading(false);
+        }
+
+        // --- Helper Function (Unchanged) ---
         function updateButtonStates() {
             if (audioBlob) {
                 submitButton.disabled = false;
@@ -402,7 +354,6 @@
                 submitButton.disabled = true;
             }
         }
-        
     </script>
 </body>
 </html>
