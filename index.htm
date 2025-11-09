@@ -297,10 +297,10 @@
                 throw new Error("Google AI Key not found. The userscript should have asked for it.");
             }
             
+            // The endpoint should be correct
             const uploadEndpoint = `https://generativelanguage.googleapis.com/v1beta/files?key=${apiKey}`;
 
             const formData = new FormData();
-            // Naming the file 'user_audio' and giving it the correct Blob/File type
             formData.append('file', audioData, 'user_audio.file'); 
             formData.append('mimeType', mimeType);
 
@@ -312,13 +312,24 @@
             });
 
             if (!response.ok) {
+                // Log the full error response for better debugging
                 const errorBody = await response.json();
+                console.error("Gemini Upload Error Details:", errorBody); 
                 throw new Error(`File Upload Error (${response.status}): ${JSON.stringify(errorBody.error || errorBody)}`);
             }
 
             const data = await response.json();
-            return data.name; // Returns the unique file identifier (e.g., 'files/abc-123')
+            
+            // --- CRITICAL CHECK: Extract the 'name' field ---
+            if (!data || !data.name) {
+                console.error("Upload response missing 'name' field:", data);
+                throw new Error("File upload succeeded but did not return a file 'name' identifier.");
+            }
+            
+            // The identifier is stored in the 'name' property (e.g., 'files/abc-123')
+            return data.name; 
         }
+
 
         /**
          * STEP 2: Send the prompt and file ID to the generateContent endpoint.
